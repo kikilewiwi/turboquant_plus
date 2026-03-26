@@ -10,7 +10,7 @@ Compresses transformer KV cache **4.6x** using PolarQuant + Walsh-Hadamard rotat
 
 ## Status: v1 Complete, Speed Optimized
 
-- 141 Python tests, 100% code coverage
+- 511 Python tests, 100% code coverage on diagnostics
 - C port integrated into llama.cpp with Metal GPU kernels
 - `--cache-type-k turbo3 --cache-type-v turbo3` works on Apple Silicon
 - **q8_0 speed parity achieved** (2747 vs 2694 tok/s prefill)
@@ -27,7 +27,7 @@ Compresses transformer KV cache **4.6x** using PolarQuant + Walsh-Hadamard rotat
 | f16 | 1.0x | — | 6.121 | — |
 | q8_0 | 2.0x | 2694 | 5.414 | baseline |
 | q4_0 | 4.0x | — | 6.142 | — |
-| **turbo3** | **4.6x** | **2747** | **5.460** | **1.02x** |
+| **turbo3** | **4.6x** | **2747** | **5.445** | **1.02x** |
 
 **4.6x compression. q8_0 speed parity at all context depths. 1% quality loss.** The trifecta.
 
@@ -75,6 +75,28 @@ Decode is 88-92% of q8_0 at typical context. At very long context (48K+) it's 72
 | TurboQuant 3-bit | 4.9× | 0.91 | 0.0018 |
 | TurboQuant 3.5-bit (outlier) | **3.8×** | 0.95 | 0.0009 |
 | TurboQuant 4-bit | 3.8× | 0.96 | 0.0007 |
+
+### Needle-In-A-Haystack (NIAH) Retrieval
+
+Tested using [Kamradt](https://github.com/gkamradt/LLMTest_NeedleInAHaystack) and [NVIDIA RULER](https://github.com/NVIDIA/RULER) methodology. Qwen3.5-35B-A3B on M5 Max 128GB.
+
+**Single Needle — Depth (0-100%) x Context Length:**
+
+| Depth | 4K | 8K | 16K | 32K |
+|-------|----|----|-----|-----|
+| q8_0 | 5/5 | 4/5 | 4/5 | 4/5 |
+| turbo3 | 5/5 | 4/5 | 5/5 | 3/5 |
+
+**q8_0: 85% (17/20). turbo3: 80% (16/20).** No systematic degradation from compression.
+
+**Multi-Key with 3 Distractors (RULER MK-NIAH):**
+
+| Cache Type | 4K | 8K | 16K | 32K |
+|------------|----|----|-----|-----|
+| q8_0 | 1/1 | 1/1 | 1/1 | 1/1 |
+| turbo3 | 1/1 | 1/1 | 1/1 | 1/1 |
+
+**100% retrieval accuracy with distractors through 32K.** turbo3 correctly ignores distractor needles at all context depths.
 
 ### Key Validation
 
