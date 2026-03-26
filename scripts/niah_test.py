@@ -480,8 +480,10 @@ def query_needle(
             {"role": "user", "content": user_content},
         ],
         "temperature": 0,
-        # Qwen3.5 uses thinking mode — needs enough tokens to finish thinking + answer
-        "max_tokens": 512,
+        # Qwen3.5 uses thinking mode — needs enough tokens to finish thinking + answer.
+        # The model scans through all text blocks in its reasoning, which can burn
+        # 1000+ tokens before producing the actual answer.
+        "max_tokens": 2048,
     }).encode()
 
     headers = {
@@ -494,14 +496,17 @@ def query_needle(
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode())
                 msg = data["choices"][0]["message"]
-                content = msg.get("content") or ""
-                # Some models put the answer in reasoning_content (Qwen3.5 thinking mode)
-                reasoning = msg.get("reasoning_content") or ""
-                # Combine both — we'll regex for the 6-digit code in either
-                full_response = f"{content} {reasoning}".strip()
-                # Strip thinking tags if present
-                full_response = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL)
-                return full_response.strip()
+                content = (msg.get("content") or "").strip()
+                # For thinking models (Qwen3.5): content has the actual answer,
+                # reasoning_content has the chain-of-thought. We ONLY score
+                # content — reasoning may mention other needles' codes.
+                if content:
+                    # Strip any remaining thinking tags
+                    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                    return content
+                # If content is empty, model ran out of tokens during thinking.
+                # Return empty — this is a legitimate miss (model couldn't retrieve in time).
+                return ""
         except (urllib.error.URLError, ConnectionError, OSError) as e:
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)
@@ -560,7 +565,7 @@ def run_config(
 
     print(f"\n  Starting server: cache={cache_type}, ctx={depth}, needles={needle_count}")
     # Use context size with some headroom for the query + response
-    server_ctx = depth + 512
+    server_ctx = depth + 4096  # Headroom for query prompt + 2048 response tokens
     proc = start_server(
         llama_dir, model_path, cache_type, server_ctx, port, verbose,
         server_timeout=server_timeout, server_bin_override=server_bin,
