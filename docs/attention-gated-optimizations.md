@@ -13,11 +13,12 @@ Opportunities identified in the Metal flash attention kernel using the same prin
 **Result:** MoE +0.6-0.9%, dense -0.8-1.1%. Tile max scan (8 reads from ss[]) costs more than it saves when most tiles have at least one non-negligible position. Not worth the complexity. See `threshold-ablation-logs/tile_skip_experiment.txt`.
 
 ### 2. Sparse V on non-quantized (f16) V path
-**Status:** TODO
+**Status:** CLOSED — not worth it
 **Location:** ggml-metal.metal ~line 7315, the `is_same<vd4_t, v4_t>` branch
 **Idea:** Sparse V currently only applies to the quantized V path (else branch). The f16 path also does multiply-accumulate for every position. Skipping negligible positions saves FMA work even without dequant savings.
 **Expected impact:** Small — no dequant to skip, just FMA. Maybe 1-3% at long context.
 **Risk:** Very low.
+**Result:** -0.3% short, +1.3% long context blended. f16 path is too cheap for the branch to pay off. See `threshold-ablation-logs/f16_sparse_v_experiment.txt`.
 
 ### 3. O rescaling skip
 **Status:** TODO
