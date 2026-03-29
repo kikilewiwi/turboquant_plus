@@ -37,7 +37,7 @@ The root cause was found by reading all 5 overloads of `build_attn` in `llama-gr
 | Qwen 27B Dense | 128 | 6.89 | 6.94 | +0.72% | 7.01 | 0.99x | ✅ |
 | Phi-4 | 128 | 6.00 | 6.10 | +1.68% | 6.23 | 0.91x | ✅ |
 | Mistral Small 24B | 128 | 6.09 | 6.12 | +0.46% | 6.28 | 0.86x | ✅ |
-| Gemma 2 27B (ISWA) | 128 | 3.75 | 3.79 | +0.9% | 3.80 | — | — |
+| Gemma 2 27B (ISWA) | 128 | 7.06 | 7.18 | +1.7% | 7.15 | 0.88x | ✅ |
 | Llama 3.1 70B | 128 | 2.44 | 2.64 | +8.3% | 2.79 | 0.94x | ✅ |
 | Mixtral 8x7B MoE | 128 | — | — | — | — | — | skipped (bad GGUF) |
 
@@ -78,11 +78,13 @@ Already validated extensively. See README and turbo4-resurrection.md.
 
 **Note:** Gemma 2 K/V head_dim IS 128 (not 256 as initially assumed — GGUF metadata confirms `key_length=128`).
 
-| Cache | PPL | vs q8_0 | Decode tok/s | NIAH |
-|-------|-----|---------|-------------|------|
-| q8_0 | 3.7504 | — | 28.44 | 3/3 |
-| turbo4 | 3.7852 | +0.9% | 26.12 | — |
-| turbo3 | 3.7957 | +1.2% | 25.36 | — |
+| Cache | PPL (8-chunk) | vs q8_0 | Decode tok/s | NIAH |
+|-------|--------------|---------|-------------|------|
+| q8_0 | 7.0590 | — | 28.28 | 3/3 |
+| turbo3 | 7.1489 | +1.3% | 24.08 | — |
+| turbo4 | 7.1794 | +1.7% | 24.79 | — |
+
+Note: turbo4 slightly worse than turbo3 on Gemma 2 — the only model showing this pattern. May be related to ISWA dual-cache interaction or Gemma's logit softcapping. Earlier 1-chunk estimates (3.75-3.80) were unreliable — use 8-chunk numbers above.
 
 This fix also applies to any other ISWA model (Cohere2, OLMo2, Gemma3N).
 
