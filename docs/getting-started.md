@@ -253,9 +253,11 @@ for i in range(boundary, n_layers - boundary):
 # Show size before/after
 python3 -c "
 import os
-src = os.path.getsize('models/qwen3.5-27b-q8_0.gguf') / (1024**3)
-dst = os.path.getsize('models/qwen3.5-27b-config-i.gguf') / (1024**3)
-print(f'Before: {src:.2f} GB  ->  After: {dst:.2f} GB  ({(1-dst/src)*100:.0f}% smaller)')
+src_path = 'models/qwen3.5-27b-q8_0.gguf'
+dst_path = 'models/qwen3.5-27b-config-i.gguf'
+src = os.path.getsize(src_path) / (1024**3)
+dst = os.path.getsize(dst_path) / (1024**3)
+print(f'{src_path}: {src:.2f} GB  ->  {dst_path}: {dst:.2f} GB  ({(1-dst/src)*100:.0f}% smaller)')
 "
 
 # 4. Benchmark — run all 3 and paste the output in the PR
