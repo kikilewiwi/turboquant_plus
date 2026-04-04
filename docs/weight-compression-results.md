@@ -35,6 +35,7 @@ Post-training weight compression for llama.cpp. No retraining, no calibration da
 | Llama 3.2-3B | 3.2B | Llama | Hybrid | 2.10G | +1.9% |
 | Mistral 7B v0.3 | 7.2B | Mistral | Hybrid | 4.40G | +1.28% |
 | Mistral 7B v0.3 | 7.2B | Mistral | Premium | 5.46G | +0.41% |
+| Gemma 4 31B | 30.7B | Gemma | Config I | 18.9G | TBD |
 | Gemma 4 26B A4B MoE | 26B | Gemma | Config I | 24.4G | -2.3% (better) |
 
 ---
