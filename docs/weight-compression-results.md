@@ -10,7 +10,7 @@ Post-training weight compression for llama.cpp. No retraining, no calibration da
 
 | Metric | Value |
 |--------|-------|
-| Independent testers | **13+** |
+| Independent testers | **14+** |
 | GPUs tested | **14+** across 5 families |
 | Models tested | **13+** across 7 families |
 | Compression from Q8_0 | **28–42% smaller** |
@@ -212,6 +212,32 @@ turbo3 extends 70B max context from ~4K to ~16K (4x) on a single 4090.
 
 **Note:** TQ4_1S PPL evaluation crashed on this tester's setup (`ggml_backend_tensor_copy` assert). Speed benchmarks work fine. Under investigation.
 
+### Independent Validation -- WaveboSF (RTX 4090 + RTX 5090, spiritbuun fork)
+
+[WaveboSF](https://github.com/ggml-org/llama.cpp/discussions/20969#discussioncomment-16436834) tested KV cache compression on Llama 3.1 8B Instruct Q4_K_M using spiritbuun's fork with FA flags enabled on two GPUs: RTX 4090 24GB (Ada Lovelace, SM 89) and RTX 5090 32GB (Blackwell, SM 120, CUDA 12.8).
+
+#### RTX 4090 (Ada Lovelace, SM 89)
+
+| K | V | pp512 vs f16 | tg128 vs f16 | Notes |
+|---|---|:------------:|:------------:|-------|
+| q8_0 | turbo4 | **+8.4%** | -6.2% | Best config on Ada |
+| turbo4 | turbo4 | +3.4% | -16.8% | Symmetric decode penalty |
+
+#### RTX 5090 (Blackwell, SM 120, CUDA 12.8)
+
+| K | V | LA | pp512 vs f16 | tg128 vs f16 | Notes |
+|---|---|:--:|:------------:|:------------:|-------|
+| q8_0 | turbo4 | 1 | **-3.2%** | -25.2% | Asymmetric still wins |
+| turbo4 | turbo4 | 1 | -8.0% | -37.8% | Symmetric decode penalty |
+
+Key findings:
+- Asymmetric q8_0-K/turbo4-V is the clear winner on both GPUs: better prefill and decode than symmetric
+- Symmetric turbo4/turbo4 decode penalty is nearly 3x worse than asymmetric on Ada, and ~1.5x worse on Blackwell
+- **Blackwell decode regression is structural, not a bug.** Ada uses dp4a integer tensor cores, Blackwell uses fp8/fp4 tensor cores. The architecture mismatch causes significant decode overhead for turbo dequant paths on Blackwell vs Ada
+- LA=1 (boundary layers at higher precision) improves decode speed on both GPUs in addition to its quality benefit
+- Confirms the asymmetric recommendation holds across both Ada (SM 89) and Blackwell (SM 120)
+- First spiritbuun fork validation with FA flags on Ada and Blackwell
+
 ---
 
 ## Decode Speed by Hardware
@@ -326,4 +352,4 @@ Verdict (works / partial / broken):
 
 ---
 
-*This is a living document. Results will be updated as new community data comes in. Last updated: 2026-04-03. Data sourced from [PR #45](https://github.com/TheTom/llama-cpp-turboquant/pull/45) comments, [X/Twitter community testing](https://x.com/no_stp_on_snek), and direct contributor reports.*
+*This is a living document. Results will be updated as new community data comes in. Last updated: 2026-04-04. Data sourced from [PR #45](https://github.com/TheTom/llama-cpp-turboquant/pull/45) comments, [X/Twitter community testing](https://x.com/no_stp_on_snek), and direct contributor reports.*

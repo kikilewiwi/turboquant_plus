@@ -280,6 +280,19 @@ These findings have been independently confirmed by multiple researchers:
 - NIAH passes at 32K across all 14 configs including catastrophic-PPL symmetric configs. Retrieval and generation quality degrade independently
 - Concludes "Asymmetric q8_0-K / 4bit-V should be the default recommendation" — matches our paper's recommendation exactly
 
+**@WaveboSF** — [Llama 3.1 8B Instruct Q4_K_M, RTX 4090 24GB + RTX 5090 32GB](https://github.com/ggml-org/llama.cpp/discussions/20969#discussioncomment-16436834) (2026-04-04):
+- spiritbuun fork with FA flags enabled. Speed-focused validation (pp512, tg128) rather than PPL
+- **RTX 4090 (Ada Lovelace, SM 89):**
+  - Asymmetric q8_0-K/turbo4-V: **+8.4% prefill**, only **-6.2% decode** vs f16. Best config on Ada
+  - Symmetric turbo4/turbo4: +3.4% prefill, **-16.8% decode**. Nearly 3x worse decode penalty than asymmetric
+- **RTX 5090 (Blackwell, SM 120, CUDA 12.8):**
+  - Asymmetric q8_0-K/turbo4-V LA=1: -3.2% prefill, **-25.2% decode** vs f16
+  - Symmetric turbo4/turbo4 LA=1: -8.0% prefill, **-37.8% decode**. Asymmetric still outperforms symmetric (same pattern, larger gap on Blackwell)
+  - **Blackwell decode regression is structural (tensor core architecture), not a bug.** Ada uses dp4a integer tensor cores, Blackwell uses fp8/fp4 tensor cores. The architecture mismatch causes significant decode overhead for turbo dequant paths
+  - LA=1 boundary layers provide a speed benefit in addition to their quality benefit on both GPUs
+- Cross-architecture confirmation: Ada SM 89 and Blackwell SM 120 (CUDA) join Metal, Ampere, HIP, and Vulkan as backends where asymmetric outperforms symmetric
+- Independent tester on independent fork (spiritbuun, not TheTom), further reducing single-implementation bias
+
 **@nihilistau** — [Vilenkin basis spectral analysis, Phi-2 + turbo3](https://github.com/ggml-org/llama.cpp/discussions/20969#discussioncomment-16442465) (2026-04-03):
 - Independent harmonic analysis of K and V cache vectors in the Vilenkin (p-adic/mixed-radix) basis suggests a spectral explanation for why asymmetric compression works
 - K vectors appear to concentrate energy in a small number of universal spectral indices (6 indices at 100% universality across all positions). V vectors appear to spread energy diffusely across the entire spectrum (max 20% universality, no dominant modes)
