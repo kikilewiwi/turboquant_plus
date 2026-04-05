@@ -546,15 +546,28 @@ Detailed debugging logs, gotchas, and benchmarks from the llama.cpp port:
 
 TurboQuant KV cache compression is being ported to Apple's [MLX framework](https://github.com/ml-explore/mlx) for native Python/Swift inference on Apple Silicon.
 
-**Fork:** [TheTom/mlx](https://github.com/TheTom/mlx) — branch `feature/turboquant-plus`
+**Fork:** [TheTom/mlx `feature/turboquant-plus`](https://github.com/TheTom/mlx/tree/feature/turboquant-plus)
 
 ### Preliminary Results (Qwen3.5-2B 8bit, M5 Max)
 
-| Config | Decode | vs Baseline | PPL Delta | KV Savings |
-|--------|--------|-------------|-----------|------------|
-| Baseline (f16 KV) | 204 tok/s | — | — | — |
-| turbo4 asymmetric (K=FP16, V=4bit) | 177 tok/s | 87% | +0.18% | 73% |
-| turbo3 | 170 tok/s | 83% | -0.10% | 80% |
+**Speed + Quality:**
+
+| Config | Prefill | Decode | vs Baseline | PPL | PPL Delta | KV Savings |
+|--------|---------|--------|-------------|-----|-----------|------------|
+| Baseline (f16 KV) | 584 | **204** | 100% | 3.0732 | — | — |
+| turbo4 all fused | 1,153 (+97%) | 168 | 83% | 3.0890 | +0.51% | 73% |
+| turbo4 asymmetric fused | 984 (+68%) | **177** | **87%** | 3.0787 | **+0.18%** | 73% |
+| turbo3 | 264 | 170 | 83% | 3.0702 | -0.10% | 80% |
+
+**Quality:** Output text indistinguishable from baseline. KL divergence < 0.001, cosine similarity > 0.989.
+
+**35B MoE (Qwen3.5-35B-A3B 8bit):**
+
+| Config | Prefill | Decode | vs Baseline |
+|--------|---------|--------|-------------|
+| Baseline | 11.4 | 95.7 | 100% |
+| turbo4 fused | 254.7 (+22x) | 53.9 | 56% |
+| turbo4 asymmetric | 241.1 (+21x) | 55.2 | 58% |
 
 ### What's implemented
 - TurboQuant encode/decode using `mx.hadamard_transform` (MLX built-in)
