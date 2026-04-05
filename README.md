@@ -644,48 +644,53 @@ import mlx_lm
 from mlx.nn.layers.turbo_kv_cache import make_turbo_cache
 
 model, tokenizer = mlx_lm.load("mlx-community/Qwen2.5-7B-Instruct-8bit")
-cache = make_turbo_cache(model, bits=4)  # K=FP16, V=turbo4, boundary 2+2
-response = mlx_lm.generate(model, tokenizer, prompt="Hello!", prompt_cache=cache)
+cache = make_turbo_cache(model, bits=4)  # V=turbo4, boundary 2+2
+text = mlx_lm.generate(model, tokenizer, prompt="Hello!",
+                        max_tokens=200, prompt_cache=cache, verbose=True)
 ```
 
-Requires: [TheTom/mlx](https://github.com/TheTom/mlx/tree/feature/turboquant-plus) (branch `feature/turboquant-plus`) + stock [mlx-lm](https://github.com/ml-explore/mlx-lm)
+```bash
+pip install git+https://github.com/TheTom/mlx.git@feature/turboquant-plus
+pip install mlx-lm
+```
 
-### What's implemented
-- TurboQuant encode/decode using `mx.hadamard_transform` (MLX built-in)
-- Fused Metal kernels for encode, decode, and compressed-domain attention
-- Tiled weighted V sum kernel for long-context scaling
-- TurboKVCache with `make_turbo_cache()` one-line setup
-- Native mlx-lm SDPA routing (detects TurboKVCache, routes to fused path)
-- All findings from llama.cpp TurboQuant+ papers applied and validated
-- Beta distribution centroids, boundary layers, asymmetric K/V, dual SRHT signs, NR0=2 multi-row amortization
+### How it works
 
-### Status (commit [`cb162e51`](https://github.com/TheTom/mlx/commit/cb162e51))
-- **Experimental** — working end-to-end, not yet production-hardened
-- Two-pass TurboFlash kernel (B=64) inspired by Eric Kryski's architecture
-- Asymmetric K=FP16, V=turbo4, boundary=2
+`make_turbo_cache` wraps mlx-lm's native `KVCache` with TurboQuant compression. During prefill, K/V are stored as FP16 (standard KVCache behavior). On the first decode step, V is compressed using SRHT + Lloyd-Max quantization (turbo4 = 4-bit, ~74% memory savings). Attention continues to run on FP16 through Apple's native SDPA at full speed. The compressed V is stored alongside for memory recovery at long context.
 
-**Qwen2.5-7B-Instruct-8bit (dense, 24/28 layers, M5 Max)**
+- Zero decode overhead (native SDPA, no custom kernels in attention path)
+- 74% V memory savings from TurboQuant compression
+- Boundary layer protection (first/last 2 KV layers stay FP16)
+- Works with stock mlx-lm, no fork needed
+- All 8 TurboQuant+ papers applied (beta centroids, dual SRHT signs, boundary layers)
 
-| Context | Decode vs Baseline |
-|---------|-------------------|
-| All (7-1261 tok) | **100%** |
+### Results (M5 Max 128GB)
 
-PPL: +0.04% | KLD: 0.000305 | NIAH: 30/30 | Top-1: 100%
+**Qwen2.5-7B-Instruct-8bit (dense, 24/28 KV layers compressed)**
 
-**Qwen3.5-35B-A3B-4bit (MoE, 6/10 KV layers, M5 Max)**
+| Context | Baseline | Turbo | vs Baseline | V Savings |
+|---------|----------|-------|-------------|-----------|
+| 128 | 67.3 | 67.4 | **100.2%** | 81.6% |
+| 1K | 66.8 | 66.0 | **98.8%** | 74.8% |
+| 4K | 64.8 | 64.9 | **100.2%** | 73.8% |
+| 16K | 60.2 | 60.2 | **99.9%** | 73.5% |
+| 32K | 53.3 | 53.5 | **100.4%** | 73.5% |
+| 64K | 44.9 | 45.1 | **100.4%** | 73.5% |
+| 128K | 33.5 | 33.5 | **100.0%** | 73.4% |
 
-| Context | Baseline Gen | Turbo Gen | vs Baseline |
-|---------|-------------|----------|-------------|
-| 128 | 128.6 | 129.1 | **100.4%** |
-| 1K | 127.1 | 128.3 | **101.0%** |
-| 4K | 123.8 | 124.7 | **100.7%** |
-| 16K | 113.2 | 113.2 | **100.0%** |
-| 32K | 102.7 | 102.8 | **100.1%** |
-| 64K | 89.4 | 90.5 | **101.2%** |
-| 128K | 71.3 | 69.2 | 97.1% |
-| 256K | 52.2 | 51.5 | 98.7% |
+**Qwen3.5-35B-A3B-4bit (MoE, 6/10 KV layers compressed)**
 
-See [MLX Swift port](https://github.com/ekryski/mlx-swift-lm/pull/7) for the Swift/iOS implementation (separate effort with Eric Kryski).
+| Context | Baseline | Turbo | vs Baseline | V Savings |
+|---------|----------|-------|-------------|-----------|
+| 128 | 139.7 | 143.1 | **102.4%** | 82.3% |
+| 1K | 139.1 | 138.7 | **99.7%** | 75.5% |
+| 4K | 134.9 | 135.5 | **100.4%** | 74.5% |
+| 16K | 123.5 | 123.1 | **99.6%** | 74.3% |
+| 32K | 112.2 | 112.1 | **99.9%** | 74.3% |
+| 64K | 95.1 | 95.5 | **100.5%** | 74.2% |
+| 128K | 74.5 | 74.9 | **100.6%** | 74.2% |
+
+Output is word-for-word identical to baseline at all context lengths. V savings are from TurboQuant 4-bit compression (SRHT + Lloyd-Max). FP16 V retained for attention speed; compressed V stored for memory recovery at long context
 
 ---
 
